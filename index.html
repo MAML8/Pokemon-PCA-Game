@@ -41,7 +41,7 @@
                 const eigs = new EigenvalueDecomposition(covarianca);
 
                 let autovaloresReais = eigs.realEigenvalues;
-                let autovetores = eigs.EigenvectorMatrix;
+                let autovetores = eigs.eigenvectorMatrix;
 
                 //Ordenação dos autovalores
                 let sortedIndices = autovaloresReais
@@ -58,8 +58,9 @@
 
                 let autovaloresOrdenados = [];
                 for(let j = 0; j < matrizA.columns; j++) {
-                    autovaloresOrdenados = autovaloresReais[sortedIndices[j]];
+                    autovaloresOrdenados[j] = autovaloresReais[sortedIndices[j]];
                 }
+                console.log(autovaloresOrdenados);
 
                 return {
                     media: media,
@@ -72,22 +73,22 @@
             function reconstrucao(pcaObj, l, r){
                 // Reconstrução: A aproximado = (A_cent * V_k) * V_k^T + Media
 
-                const Vk = pcaObj.eigenvectors.subMatrix(0, pca.matrizCentralizada.columns - 1, l - 1, r - 1);
+                const Vk = pcaObj.autovetores.subMatrix(0, pcaObj.matrizCentralizada.columns - 1, l - 1, r - 1);
                 
-                const scores = pcaObj.centeredMatrix.mmul(Vk);
+                const scores = pcaObj.matrizCentralizada.mmul(Vk);
 
                 const reconstructed = scores.mmul(Vk.transpose());
 
-                return reconstructed.addRowVector(pcaObj.mean);
+                return reconstructed.addRowVector(pcaObj.media);
             }
 
             function reconstrucao_melhor(pcaObj, k){
                 return reconstrucao(pcaObj, 1, k);
             }
             // Configurações
-            const POKE_SIZE = 80; 
-            const NUM_POKE_LEFT = 3;
-            const NUM_POKE_DOWN = 3;
+            const POKE_SIZE = 160;
+            const NUM_POKE_LEFT = 1;
+            const NUM_POKE_DOWN = 1;
             const WIDTH = POKE_SIZE * NUM_POKE_LEFT;
             const HEIGHT = POKE_SIZE * NUM_POKE_DOWN;
 
@@ -142,28 +143,26 @@
                 
                 img.onload = () => {
                     // Desenha imagem original no canvas para ler os pixels
-                    ctx.clearRect(0, 0, IMG_SIZE, IMG_SIZE);
-                    ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
-                    const imgData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE);
+                    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+                    ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+                    const imgData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
                     
                     // Separa os canais de cor
                     const r = [], g = [], b = [];
-                    for (let i = 0; i < IMG_SIZE; i++) {
+                    for (let i = 0; i < HEIGHT; i++) {
                         r[i] = []; g[i] = []; b[i] = [];
-                        for (let j = 0; j < IMG_SIZE; j++) {
-                            const idx = (i * IMG_SIZE + j) * 4;
+                        for (let j = 0; j < WIDTH; j++) {
+                            const idx = (i * WIDTH + j) * 4;
                             r[i][j] = imgData.data[idx];
                             g[i][j] = imgData.data[idx+1];
                             b[i][j] = imgData.data[idx+2];
                         }
                     }
 
-                    // Calcula SVD (CPU)
-                    // Isso pode levar 0.5s ~ 1s dependendo do PC
                     try {
-                        svdData.r = matriz(r);
-                        svdData.g = matriz(g);
-                        svdData.b = matriz(b);
+                        pcaData.r = PCA(new Matrix(r));
+                        pcaData.g = PCA(new Matrix(g));
+                        pcaData.b = PCA(new Matrix(b));
 
                         currentK = 2; // Começa bem difícil
                         reconstruct(currentK);
@@ -172,24 +171,24 @@
                         console.log("Resposta (Cheat):", currentPokemon);
                     } catch(err) {
                         console.error(err);
-                        statusEl.innerText = "Erro no cálculo SVD";
+                        statusEl.innerText = "Erro no cálculo PCA";
                     }
                 };
             }
 
             function reconstruct(k) {
-                compCountEl.innerText = k + " / " + IMG_SIZE;
+                compCountEl.innerText = k + " / " + WIDTH;
                 
                 // Reconstrói cada canal separadamente
-                const newR = reconstructChannel(svdData.r, k);
-                const newG = reconstructChannel(svdData.g, k);
-                const newB = reconstructChannel(svdData.b, k);
+                const newR = reconstrucao_melhor(pcaData.r, k);
+                const newG = reconstrucao_melhor(pcaData.g, k);
+                const newB = reconstrucao_melhor(pcaData.b, k);
 
                 // Joga pixels de volta no canvas
-                const finalImgData = ctx.createImageData(IMG_SIZE, IMG_SIZE);
-                for (let i = 0; i < IMG_SIZE; i++) {
-                    for (let j = 0; j < IMG_SIZE; j++) {
-                        const idx = (i * IMG_SIZE + j) * 4;
+                const finalImgData = ctx.createImageData(WIDTH, HEIGHT);
+                for (let i = 0; i < HEIGHT; i++) {
+                    for (let j = 0; j < WIDTH; j++) {
+                        const idx = (i * WIDTH + j) * 4;
                         // .get(linha, coluna)
                         finalImgData.data[idx] = clamp(newR.get(i, j));
                         finalImgData.data[idx+1] = clamp(newG.get(i, j));
@@ -249,7 +248,7 @@
                 inputEl.value = "";
                 disableControls();
                 statusEl.style.color = "#2f3542";
-                ctx.clearRect(0,0,IMG_SIZE, IMG_SIZE);
+                ctx.clearRect(0,0,WIDTH, HEIGHT);
             }
 
             function enableControls() {
