@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+    <head>
+        <meta charset="UTF-8">
+        <title>Quem é esse Pokémon? (SVD Corrigido)</title>
+        <link rel="stylesheet" type="text/css" href="style.css">
+    </head>
+    <body>
+
+        <div class="card">
+            <h1>Quem é esse Pokémon?</h1>
+            <div class="stats">Componentes usados: <span id="compCount">0</span></div>
+            
+            <canvas id="canvas" width="96" height="96"></canvas>
+            
+            <div id="status">Iniciando...</div>
+
+            <input type="text" id="guess" placeholder="Digite o nome..." disabled>
+            <div class="controls">
+                <button id="btnGuess" disabled>CHUTAR</button>
+                <button id="btnSkip" disabled>PULAR</button>
+            </div>
+        </div>
+
+        <script src="https://unpkg.com/pokeapi-js-wrapper/dist/index.js"></script>
+        <script src="get_pokemon_data.js"></script>
+        <script type="module">
+            //------------PCA-----------
+            import { Matrix, EigenvalueDecomposition } from 'https://esm.sh/ml-matrix@6.10.4';
+
+            function matriz(a){
+                return new Matrix(a);
+            }
+
+            function PCA(matrizA){
+                const media = matrizA.mean('column')
+                const centralizada = matrizA.subRowVector(media);
+
+                const covarianca = centralizada.transpose().mmul(centralizada);
+
+                const eigs = new EigenvalueDecomposition(covarianca);
+
+                let autovaloresReais = eigs.realEigenvalues;
+                let autovetores = eigs.EigenvectorMatrix;
+
+                //Ordenação dos autovalores
+                let sortedIndices = autovaloresReais
+                    .map((val, idx) => ({ val, idx }))
+                    .sort((a, b) => b.val - a.val) // Decrescente
+                    .map(item => item.idx);
+
+                // Reordenamos a matriz de autovetores baseada nos índices ordenados
+                let sortedV = new Matrix(matrizA.columns, matrizA.columns); // M x M
+                for(let j = 0; j < matrizA.columns; j++) {
+                    sortedV.setColumn(j, autovetores.getColumn(sortedIndices[j]));
+                }
+
+
+                let autovaloresOrdenados = [];
+                for(let j = 0; j < matrizA.columns; j++) {
+                    autovaloresOrdenados = autovaloresReais[sortedIndices[j]];
+                }
+
+                return {
+                    media: media,
+                    matrizCentralizada: centralizada,
+                    autovalores: autovaloresOrdenados,
+                    autovetores: sortedV
+                }
+            }
+
+            function reconstrucao(pcaObj, l, r){
+                // Reconstrução: A aproximado = (A_cent * V_k) * V_k^T + Media
+
+                const Vk = pcaObj.eigenvectors.subMatrix(0, pca.matrizCentralizada.columns - 1, l - 1, r - 1);
+                
+                const scores = pcaObj.centeredMatrix.mmul(Vk);
+
+                const reconstructed = scores.mmul(Vk.transpose());
+
+                return reconstructed.addRowVector(pcaObj.mean);
+            }
+
+            function reconstrucao_melhor(pcaObj, k){
+                return reconstrucao(pcaObj, 1, k);
+            }
+            // Configurações
+            const POKE_SIZE = 80; 
+            const NUM_POKE_LEFT = 3;
+            const NUM_POKE_DOWN = 3;
+            const WIDTH = POKE_SIZE * NUM_POKE_LEFT;
+            const HEIGHT = POKE_SIZE * NUM_POKE_DOWN;
+
+            let pcaData = { r: null, g: null, b: null };
+
+            let currentPokemon = [];
+            let currentK = 1;
+            const MAX_K = 50;
+
+            // Referências DOM
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const statusEl = document.getElementById('status');
+            const inputEl = document.getElementById('guess');
+            const btnGuess = document.getElementById('btnGuess');
+            const btnSkip = document.getElementById('btnSkip');
+            const compCountEl = document.getElementById('compCount');
+
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+
+            // --------------------- Processamento dos Dados -----------------------
+
+            async function startGame() {
+                resetUI();
+                statusEl.innerText = "Procurando Pokémon selvagens...";
+                statusEl.style.color = "#333";
+                btnGuess.disabled = true;
+                btnSkip.disabled = true;
+                
+                try {
+                    const data = await get_random_pokemon();
+                    
+                    currentPokemon = normalize(data.name);
+                    const imgUrl = data.sprites.other['official-artwork'].front_default; 
+
+                    statusEl.innerText = "Processando matemática...";
+                    // Pequeno delay para a UI não travar antes de escrever o texto
+                    setTimeout(() => processImage(imgUrl), 10);
+
+                } catch (e) {
+                    statusEl.innerText = "Erro na conexão API :(";
+                    console.error(e);
+                    btnSkip.disabled = false;
+                }
+            }
+
+            async function processImage(url) {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.src = url;
+                
+                img.onload = () => {
+                    // Desenha imagem original no canvas para ler os pixels
+                    ctx.clearRect(0, 0, IMG_SIZE, IMG_SIZE);
+                    ctx.drawImage(img, 0, 0, IMG_SIZE, IMG_SIZE);
+                    const imgData = ctx.getImageData(0, 0, IMG_SIZE, IMG_SIZE);
+                    
+                    // Separa os canais de cor
+                    const r = [], g = [], b = [];
+                    for (let i = 0; i < IMG_SIZE; i++) {
+                        r[i] = []; g[i] = []; b[i] = [];
+                        for (let j = 0; j < IMG_SIZE; j++) {
+                            const idx = (i * IMG_SIZE + j) * 4;
+                            r[i][j] = imgData.data[idx];
+                            g[i][j] = imgData.data[idx+1];
+                            b[i][j] = imgData.data[idx+2];
+                        }
+                    }
+
+                    // Calcula SVD (CPU)
+                    // Isso pode levar 0.5s ~ 1s dependendo do PC
+                    try {
+                        svdData.r = matriz(r);
+                        svdData.g = matriz(g);
+                        svdData.b = matriz(b);
+
+                        currentK = 2; // Começa bem difícil
+                        reconstruct(currentK);
+                        enableControls();
+                        statusEl.innerText = "Quem é?";
+                        console.log("Resposta (Cheat):", currentPokemon);
+                    } catch(err) {
+                        console.error(err);
+                        statusEl.innerText = "Erro no cálculo SVD";
+                    }
+                };
+            }
+
+            function reconstruct(k) {
+                compCountEl.innerText = k + " / " + IMG_SIZE;
+                
+                // Reconstrói cada canal separadamente
+                const newR = reconstructChannel(svdData.r, k);
+                const newG = reconstructChannel(svdData.g, k);
+                const newB = reconstructChannel(svdData.b, k);
+
+                // Joga pixels de volta no canvas
+                const finalImgData = ctx.createImageData(IMG_SIZE, IMG_SIZE);
+                for (let i = 0; i < IMG_SIZE; i++) {
+                    for (let j = 0; j < IMG_SIZE; j++) {
+                        const idx = (i * IMG_SIZE + j) * 4;
+                        // .get(linha, coluna)
+                        finalImgData.data[idx] = clamp(newR.get(i, j));
+                        finalImgData.data[idx+1] = clamp(newG.get(i, j));
+                        finalImgData.data[idx+2] = clamp(newB.get(i, j));
+                        finalImgData.data[idx+3] = 255; // Alpha total
+                    }
+                }
+                ctx.putImageData(finalImgData, 0, 0);
+            }
+
+            // --- Controles e UI ---
+
+            function checkGuess() {
+                const userGuess = normalize(inputEl.value);
+                if (userGuess === currentPokemon) {
+                    endGame(true);
+                } else {
+                    inputEl.value = "";
+                    inputEl.focus();
+                    statusEl.innerText = "Errou! Melhorando a imagem...";
+                    statusEl.style.color = "#e84118";
+                    
+                    // Aumenta a clareza
+                    currentK += 5;
+                    if(currentK > MAX_K) currentK = MAX_K;
+                    reconstruct(currentK);
+                    
+                    setTimeout(() => {
+                        statusEl.style.color = "#2f3542";
+                        statusEl.innerText = "Tente de novo!";
+                    }, 1000);
+                }
+            }
+
+            function endGame(win) {
+                disableControls();
+                reconstruct(MAX_K); // Mostra imagem perfeita
+                
+                if(win) {
+                    statusEl.innerText = `ACERTOU! É o ${currentPokemon.toUpperCase()}!`;
+                    statusEl.style.color = "#44bd32";
+                } else {
+                    statusEl.innerText = `Era o ${currentPokemon.toUpperCase()}!`;
+                    statusEl.style.color = "#0097e6";
+                }
+                
+                setTimeout(startGame, 4000);
+            }
+
+            function normalize(str) { 
+                return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); 
+            }
+
+            function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+
+            function resetUI() {
+                inputEl.value = "";
+                disableControls();
+                statusEl.style.color = "#2f3542";
+                ctx.clearRect(0,0,IMG_SIZE, IMG_SIZE);
+            }
+
+            function enableControls() {
+                inputEl.disabled = false;
+                btnGuess.disabled = false;
+                btnSkip.disabled = false;
+                inputEl.focus();
+            }
+
+            function disableControls() {
+                inputEl.disabled = true;
+                btnGuess.disabled = true;
+                btnSkip.disabled = true;
+            }
+
+            // Event Listeners (Isso substitui o onclick do HTML)
+            btnGuess.addEventListener('click', checkGuess);
+            btnSkip.addEventListener('click', () => endGame(false));
+            inputEl.addEventListener('keypress', (e) => {
+                if(e.key === 'Enter') checkGuess();
+            });
+
+            // Inicia tudo
+            startGame();
+        </script>
+    </body>
+</html>
