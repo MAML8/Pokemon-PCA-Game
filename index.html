@@ -184,6 +184,8 @@
             function checkGuess() {
                 const userGuess = normalize(inputEl.value);
                 let incorrect = true;
+                inputEl.value = "";
+                inputEl.focus();
                 for(let i = 0; i<NUM_POKE_DOWN; i++){
                     for(let j = 0; j<NUM_POKE_RIGHT; j++){
                         if(currentPokemon[i][j].found) continue;
@@ -197,8 +199,6 @@
                 }
 
                 if(incorrect){
-                    inputEl.value = "";
-                    inputEl.focus();
                     statusEl.innerText = "Errou! Melhorando a imagem...";
                     statusEl.style.color = "#e84118";
                     
