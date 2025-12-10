@@ -28,14 +28,16 @@
             import {matriz, PCA, reconstrucao_melhor, reconstrucao} from './pca.js';
             // Configurações
             const POKE_SIZE = 160;
-            const NUM_POKE_LEFT = 1;
+            const NUM_POKE_RIGHT = 1;
             const NUM_POKE_DOWN = 1;
-            const WIDTH = POKE_SIZE * NUM_POKE_LEFT;
+            const WIDTH = POKE_SIZE * NUM_POKE_RIGHT;
             const HEIGHT = POKE_SIZE * NUM_POKE_DOWN;
+            const POKE_TOTAL = NUM_POKE_DOWN * NUM_POKE_RIGHT;
 
             let pcaData = { r: null, g: null, b: null };
 
             let currentPokemon = [];
+            let currentCorrect = 0;
             let currentK = 1;
             const MAX_K = 50;
 
@@ -53,22 +55,34 @@
 
             // --------------------- Processamento dos Dados -----------------------
 
+            function tratar_dados(data){
+                return {
+                    name: normalize(data.name),
+                    img: data.sprites.other['official-artwork'].front_default,
+                    crie: data.cries.latest,
+                    found: false
+                };
+            }
+
             async function startGame() {
                 resetUI();
+                currentCorrect = 0;
                 statusEl.innerText = "Procurando Pokémon selvagens...";
                 statusEl.style.color = "#333";
-                btnGuess.disabled = true;
-                btnSkip.disabled = true;
                 
                 try {
-                    const data = await get_random_pokemon();
-                    
-                    currentPokemon = normalize(data.name);
-                    const imgUrl = data.sprites.other['official-artwork'].front_default; 
+                    let imgs = [];
+                    for(let i = 0; i<NUM_POKE_DOWN; i++){
+                        for(let j = 0; j< NUM_POKE_RIGHT; i++){
+                            const data = await get_random_pokemon();
+
+                            currentPokemon[i][j] = tratar_dados(data);
+                        }
+                    }
 
                     statusEl.innerText = "Processando matemática...";
                     // Pequeno delay para a UI não travar antes de escrever o texto
-                    setTimeout(() => processImage(imgUrl), 10);
+                    setTimeout(() => processImage(), 10);
 
                 } catch (e) {
                     statusEl.innerText = "Erro na conexão API :(";
@@ -77,15 +91,24 @@
                 }
             }
 
-            async function processImage(url) {
-                const img = new Image();
-                img.crossOrigin = "anonymous";
-                img.src = url;
+            async function processImage() {
+                let imgs = []
+                for(let i = 0; i<NUM_POKE_DOWN; i++){
+                    for(let j = 0; j< NUM_POKE_RIGHT; i++){
+                        const img = new Image();
+                        img.crossOrigin = "anonymous";
+                        img.src = url;
+                        imgs[i][j] = img;
+                    }
+                }
                 
-                img.onload = () => {
-                    // Desenha imagem original no canvas para ler os pixels
+                imgs[NUM_POKE_DOWN-1][NUM_POKE_RIGHT-1].onload = () => {
                     ctx.clearRect(0, 0, WIDTH, HEIGHT);
-                    ctx.drawImage(img, 0, 0, WIDTH, HEIGHT);
+
+                    for(let i = 0; i<NUM_POKE_DOWN; i++)
+                        for(let j = 0; j<NUM_POKE_RIGHT; j++)
+                            ctx.drawImage(imgs[i][j], i*POKE_SIZE, j*POKE_SIZE, WIDTH, HEIGHT);
+                    
                     const imgData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
                     
                     // Separa os canais de cor
@@ -108,7 +131,7 @@
                         currentK = 2; // Começa bem difícil
                         reconstruct(currentK);
                         enableControls();
-                        statusEl.innerText = "Quem é?";
+                        statusEl.innerText = "Quem são?";
                         console.log("Resposta (Cheat):", currentPokemon);
                     } catch(err) {
                         console.error(err);
@@ -144,16 +167,27 @@
 
             function checkGuess() {
                 const userGuess = normalize(inputEl.value);
-                if (userGuess === currentPokemon) {
-                    endGame(true);
-                } else {
+                incorrect = true;
+                for(let i = 0; i<NUM_POKE_DOWN; i++){
+                    for(let j = 0; j<NUM_POKE_RIGHT; j++){
+                        if(currentPokemon[i][j].found) continue;
+
+                        if (userGuess === currentPokemon[i][j].name) {
+                            score(i,j);
+                            incorrect = false;
+                            break;
+                        }
+                    }
+                }
+
+                if(incorrect){
                     inputEl.value = "";
                     inputEl.focus();
                     statusEl.innerText = "Errou! Melhorando a imagem...";
                     statusEl.style.color = "#e84118";
                     
                     // Aumenta a clareza
-                    currentK += 5;
+                    currentK += 3;
                     if(currentK > MAX_K) currentK = MAX_K;
                     reconstruct(currentK);
                     
@@ -164,15 +198,30 @@
                 }
             }
 
+            function score(i, j){
+                statusEl.innerText = `ACERTOU O ${currentPokemon[i][j].name.toUpperCase()}!!`;
+                statusEl.style.color = "#44bd32";
+                setTimeout(()=>{
+                    statusEl.style.color = "#2f3542";
+                    statusEl.innerText = "Continue!";
+                }, 1000)
+
+                currentPokemon[i][j].found = true;
+                currentCorrect++;
+                if(currentCorrect>=POKE_TOTAL){
+                    endGame(true);
+                }
+            }
+
             function endGame(win) {
                 disableControls();
                 reconstruct(MAX_K); // Mostra imagem perfeita
                 
                 if(win) {
-                    statusEl.innerText = `ACERTOU! É o ${currentPokemon.toUpperCase()}!`;
+                    statusEl.innerText = `ACERTOU TODOS!!`;
                     statusEl.style.color = "#44bd32";
                 } else {
-                    statusEl.innerText = `Era o ${currentPokemon.toUpperCase()}!`;
+                    statusEl.innerText = `Pouxa Pulou :(`;
                     statusEl.style.color = "#0097e6";
                 }
                 
