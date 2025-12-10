@@ -27,19 +27,19 @@
         <script type="module">
             import {matriz, PCA, reconstrucao_melhor, reconstrucao} from './pca.js';
             // Configurações
-            const POKE_SIZE = 96;
+            const POKE_SIZE = 160;
             const NUM_POKE_RIGHT = 3;
-            const NUM_POKE_DOWN = 3;
+            const NUM_POKE_DOWN = 2;
             const WIDTH = POKE_SIZE * NUM_POKE_RIGHT;
             const HEIGHT = POKE_SIZE * NUM_POKE_DOWN;
             const POKE_TOTAL = NUM_POKE_DOWN * NUM_POKE_RIGHT;
 
             let pcaData = { r: null, g: null, b: null };
 
-            let currentPokemon = [];
+            let currentPokemon = [[]];
             let currentCorrect = 0;
             let currentK = 1;
-            const MAX_K = 50;
+            const MAX_K = 25;
 
             // Referências DOM
             const canvas = document.getElementById('canvas');
@@ -55,13 +55,21 @@
 
             // --------------------- Processamento dos Dados -----------------------
 
-            function tratar_dados(data){
+            async function tratar_dados(data){
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.src = data.sprites.other['official-artwork'].front_default;
+                await new Promise(r => img.onload = r);
                 return {
-                    name: normalize(data.name),
-                    img: data.sprites.other['official-artwork'].front_default,
+                    name: normalize(data.species.name),
+                    img: img,
                     crie: data.cries.latest,
                     found: false
                 };
+            }
+
+            function set_currentPokemon(data){
+                currentPokemon = data;
             }
 
             async function startGame() {
@@ -69,17 +77,18 @@
                 currentCorrect = 0;
                 statusEl.innerText = "Procurando Pokémon selvagens...";
                 statusEl.style.color = "#333";
-                
                 try {
+                    const poke_data = new Array(NUM_POKE_DOWN);
                     for(let i = 0; i<NUM_POKE_DOWN; i++){
-                        currentPokemon[i] = [];
-                        console.log(currentCorrect[i])
-                        for(let j = 0; j< NUM_POKE_RIGHT; i++){
+                        poke_data[i] = new Array(NUM_POKE_RIGHT);
+                        for(let j = 0; j< NUM_POKE_RIGHT; j++){
                             const data = await get_random_pokemon();
 
-                            currentPokemon[i][j] = tratar_dados(data);
+                            poke_data[i][j] = await tratar_dados(data);
                         }
                     }
+
+                    set_currentPokemon(poke_data);
 
                     statusEl.innerText = "Processando matemática...";
                     // Pequeno delay para a UI não travar antes de escrever o texto
@@ -93,61 +102,55 @@
             }
 
             async function processImage() {
-                let imgs = []
+                const collageCanvas = document.createElement('canvas');
+                collageCanvas.width = WIDTH;
+                collageCanvas.height = HEIGHT;
+                const collageCtx = collageCanvas.getContext('2d');
+                collageCtx.clearRect(0, 0, WIDTH, HEIGHT);
+
                 for(let i = 0; i<NUM_POKE_DOWN; i++){
-                    for(let j = 0; j< NUM_POKE_RIGHT; i++){
-                        const img = new Image();
-                        img.crossOrigin = "anonymous";
-                        img.src = url;
-                        imgs[i][j] = img;
+                    for(let j = 0; j<NUM_POKE_RIGHT; j++){
+                        collageCtx.drawImage(currentPokemon[i][j].img, j*POKE_SIZE, i*POKE_SIZE, POKE_SIZE, POKE_SIZE);
                     }
                 }
                 
-                imgs[NUM_POKE_DOWN-1][NUM_POKE_RIGHT-1].onload = () => {
-                    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-                    for(let i = 0; i<NUM_POKE_DOWN; i++)
-                        for(let j = 0; j<NUM_POKE_RIGHT; j++)
-                            ctx.drawImage(imgs[i][j], i*POKE_SIZE, j*POKE_SIZE, WIDTH, HEIGHT);
-                    
-                    const imgData = ctx.getImageData(0, 0, WIDTH, HEIGHT);
-                    
-                    // Separa os canais de cor
-                    const r = [], g = [], b = [];
-                    for (let i = 0; i < HEIGHT; i++) {
-                        r[i] = []; g[i] = []; b[i] = [];
-                        for (let j = 0; j < WIDTH; j++) {
-                            const idx = (i * WIDTH + j) * 4;
-                            r[i][j] = imgData.data[idx];
-                            g[i][j] = imgData.data[idx+1];
-                            b[i][j] = imgData.data[idx+2];
-                        }
+                const imgData = collageCtx.getImageData(0, 0, WIDTH, HEIGHT);
+                
+                // Separa os canais de cor
+                const r = [], g = [], b = [];
+                for (let i = 0; i < HEIGHT; i++) {
+                    r[i] = []; g[i] = []; b[i] = [];
+                    for (let j = 0; j < WIDTH; j++) {
+                        const idx = (i * WIDTH + j) * 4;
+                        r[i][j] = imgData.data[idx];
+                        g[i][j] = imgData.data[idx+1];
+                        b[i][j] = imgData.data[idx+2];
                     }
+                }
 
-                    try {
-                        pcaData.r = PCA(matriz(r));
-                        pcaData.g = PCA(matriz(g));
-                        pcaData.b = PCA(matriz(b));
+                try {
+                    pcaData.r = PCA(matriz(r));
+                    pcaData.g = PCA(matriz(g));
+                    pcaData.b = PCA(matriz(b));
 
-                        currentK = 2; // Começa bem difícil
-                        reconstruct(currentK);
-                        enableControls();
-                        statusEl.innerText = "Quem são?";
-                        console.log("Resposta (Cheat):", currentPokemon);
-                    } catch(err) {
-                        console.error(err);
-                        statusEl.innerText = "Erro no cálculo PCA";
-                    }
-                };
+                    currentK = 2; // Começa bem difícil
+                    reconstruct(currentK);
+                    enableControls();
+                    statusEl.innerText = "Quem são?";
+                    console.log("Resposta (Cheat):", currentPokemon);
+                } catch(err) {
+                    console.error(err);
+                    statusEl.innerText = "Erro no cálculo PCA";
+                }
             }
 
             function reconstruct(k) {
-                compCountEl.innerText = k + " / " + WIDTH;
+                compCountEl.innerText = (k+10) + " / " + WIDTH;
                 
                 // Reconstrói cada canal separadamente
-                const newR = reconstrucao_melhor(pcaData.r, k);
-                const newG = reconstrucao_melhor(pcaData.g, k);
-                const newB = reconstrucao_melhor(pcaData.b, k);
+                const newR = reconstrucao(pcaData.r, MAX_K - k, MAX_K + 10);
+                const newG = reconstrucao(pcaData.g, MAX_K - k, MAX_K + 10);
+                const newB = reconstrucao(pcaData.b, MAX_K - k, MAX_K + 10);
 
                 // Joga pixels de volta no canvas
                 const finalImgData = ctx.createImageData(WIDTH, HEIGHT);
@@ -162,13 +165,25 @@
                     }
                 }
                 ctx.putImageData(finalImgData, 0, 0);
+                show_found();
+            }
+
+            function show_found(or_all = false){
+                for(let i = 0; i<NUM_POKE_DOWN; i++){
+                    for(let j = 0; j<NUM_POKE_RIGHT; j++){
+                        if(!currentPokemon[i][j].found&&!or_all) continue;
+
+                        ctx.clearRect(j*POKE_SIZE, i*POKE_SIZE, POKE_SIZE, POKE_SIZE);
+                        ctx.drawImage(currentPokemon[i][j].img, j*POKE_SIZE, i*POKE_SIZE, POKE_SIZE, POKE_SIZE);
+                    }
+                }
             }
 
             // --- Controles e UI ---
 
             function checkGuess() {
                 const userGuess = normalize(inputEl.value);
-                incorrect = true;
+                let incorrect = true;
                 for(let i = 0; i<NUM_POKE_DOWN; i++){
                     for(let j = 0; j<NUM_POKE_RIGHT; j++){
                         if(currentPokemon[i][j].found) continue;
@@ -200,14 +215,15 @@
             }
 
             function score(i, j){
+                currentPokemon[i][j].found = true;
+                show_found();
                 statusEl.innerText = `ACERTOU O ${currentPokemon[i][j].name.toUpperCase()}!!`;
                 statusEl.style.color = "#44bd32";
+
                 setTimeout(()=>{
                     statusEl.style.color = "#2f3542";
                     statusEl.innerText = "Continue!";
                 }, 1000)
-
-                currentPokemon[i][j].found = true;
                 currentCorrect++;
                 if(currentCorrect>=POKE_TOTAL){
                     endGame(true);
@@ -216,12 +232,12 @@
 
             function endGame(win) {
                 disableControls();
-                reconstruct(MAX_K); // Mostra imagem perfeita
                 
                 if(win) {
                     statusEl.innerText = `ACERTOU TODOS!!`;
                     statusEl.style.color = "#44bd32";
                 } else {
+                    show_found(true);
                     statusEl.innerText = `Pouxa Pulou :(`;
                     statusEl.style.color = "#0097e6";
                 }
@@ -230,7 +246,7 @@
             }
 
             function normalize(str) { 
-                return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); 
+                return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().replace('-', ' ');
             }
 
             function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }

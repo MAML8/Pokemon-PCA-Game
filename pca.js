@@ -36,7 +36,6 @@ export function PCA(matrizA){
         autovaloresOrdenados[j] = autovaloresReais[sortedIndices[j]];
         totalAutovalores += autovaloresReais[j];
     }
-    console.log(autovaloresOrdenados);
 
     return {
         media: media,

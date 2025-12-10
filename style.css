@@ -1,6 +1,16 @@
-body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-.card { background: white; padding: 30px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-canvas { border: 2px solid #333; background: #eee; margin: 20px auto; display: block; image-rendering: pixelated; } /* Pixelated deixa a imagem retro nítida */
+body { font-family: 'Segoe UI', sans-serif; text-align: center; background: #2f3542; color: white; padding: 20px; }
+.card { background: #fff; color: #333; padding: 20px; border-radius: 12px; display: inline-block; max-width: 600px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+
+/* O Canvas será retangular (panorâmico) */
+canvas { 
+    border: 2px solid #333; 
+    background: #eee; 
+    margin: 20px auto; 
+    display: block; 
+    image-rendering: pixelated; 
+    max-width: 100%;
+}
+
 .controls { margin-top: 15px; display: flex; gap: 5px; }
 button { padding: 10px; cursor: pointer; color: white; border: none; border-radius: 5px; font-weight: bold; flex: 1; }
 #btnGuess { background: #ff4757; }
@@ -9,3 +19,4 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 input { padding: 10px; font-size: 16px; border: 1px solid #ddd; border-radius: 5px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
 #status { font-weight: bold; margin: 15px 0; min-height: 24px; color: #2f3542; }
 .stats { font-size: 12px; color: #a4b0be; }
+
