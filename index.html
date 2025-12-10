@@ -27,9 +27,9 @@
         <script type="module">
             import {matriz, PCA, reconstrucao_melhor, reconstrucao} from './pca.js';
             // Configurações
-            const POKE_SIZE = 160;
-            const NUM_POKE_RIGHT = 1;
-            const NUM_POKE_DOWN = 1;
+            const POKE_SIZE = 96;
+            const NUM_POKE_RIGHT = 3;
+            const NUM_POKE_DOWN = 3;
             const WIDTH = POKE_SIZE * NUM_POKE_RIGHT;
             const HEIGHT = POKE_SIZE * NUM_POKE_DOWN;
             const POKE_TOTAL = NUM_POKE_DOWN * NUM_POKE_RIGHT;
@@ -73,6 +73,7 @@
                 try {
                     let imgs = [];
                     for(let i = 0; i<NUM_POKE_DOWN; i++){
+                        currentPokemon[i] = [];
                         for(let j = 0; j< NUM_POKE_RIGHT; i++){
                             const data = await get_random_pokemon();
 
