@@ -71,9 +71,9 @@
                 statusEl.style.color = "#333";
                 
                 try {
-                    let imgs = [];
                     for(let i = 0; i<NUM_POKE_DOWN; i++){
                         currentPokemon[i] = [];
+                        console.log(currentCorrect[i])
                         for(let j = 0; j< NUM_POKE_RIGHT; i++){
                             const data = await get_random_pokemon();
 
