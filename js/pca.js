@@ -2,12 +2,9 @@
 //------------PCA-----------
 import { Matrix, EigenvalueDecomposition } from 'https://esm.sh/ml-matrix@6.10.4';
 
-export function matriz(a){
-    return new Matrix(a);
-}
-
 export function PCA(matrizA){
-    const media = matrizA.mean('column')
+    matrizA = new Matrix(matrizA);
+    const media = matrizA.mean('column');
     const centralizada = matrizA.subRowVector(media);
 
     const covarianca = centralizada.transpose().mmul(centralizada);
@@ -49,10 +46,10 @@ export function PCA(matrizA){
 export function reconstrucao(pcaObj, l, r){
     // Reconstrução: A aproximado = (A_cent * V_k) * V_k^T + Media
 
-    let erro = pcaObj.totalAutovalores;
-    for(let i = l-1; i<r-1; i++)
-        erro -= pcaObj.autovalores[i];
-    console.log(erro/pcaObj.totalAutovalores*100.0);
+    //let erro = pcaObj.totalAutovalores;
+    //for(let i = l-1; i<r-1; i++)
+    //    erro -= pcaObj.autovalores[i];
+    //console.log(erro/pcaObj.totalAutovalores*100.0);
 
     const Vk = pcaObj.autovetores.subMatrix(0, pcaObj.matrizCentralizada.columns - 1, l - 1, r - 1);
     
