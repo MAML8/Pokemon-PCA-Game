@@ -295,5 +295,5 @@ btnGuess.addEventListener('click', checkGuess);
 btnSkip.addEventListener('click', () => endImage(false));
 inputEl.addEventListener('keypress', (e) => {
     if(e.key === 'Enter') checkGuess();
-    else if(e.key === 'Alt') endImage(false);
+    else if(e.key === 'Ctrl') endImage(false);
 });
