@@ -158,9 +158,9 @@ function reconstruct(k) {
     compCountEl.innerText = (k+FREE_REVEAL) + " / " + (MAX_K + FREE_REVEAL);
     
     // Reconstrói cada canal separadamente
-    const newR = reconstrucao(pcaData.r, MAX_K - k, MAX_K + FREE_REVEAL);
-    const newG = reconstrucao(pcaData.g, MAX_K - k, MAX_K + FREE_REVEAL);
-    const newB = reconstrucao(pcaData.b, MAX_K - k, MAX_K + FREE_REVEAL);
+    const newR = reconstrucao(pcaData.r, MAX_K - k + 1, MAX_K + FREE_REVEAL);
+    const newG = reconstrucao(pcaData.g, MAX_K - k + 1, MAX_K + FREE_REVEAL);
+    const newB = reconstrucao(pcaData.b, MAX_K - k + 1, MAX_K + FREE_REVEAL);
 
     // Joga pixels de volta no canvas
     const finalImgData = ctx.createImageData(WIDTH, HEIGHT);
@@ -295,4 +295,5 @@ btnGuess.addEventListener('click', checkGuess);
 btnSkip.addEventListener('click', () => endImage(false));
 inputEl.addEventListener('keypress', (e) => {
     if(e.key === 'Enter') checkGuess();
+    else if(e.key === 'p') endImage(false);
 });
